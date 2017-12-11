@@ -390,7 +390,7 @@ def browser_extension(request):
 
 def slack(request):
     context = {
-
+        'active': 'slack', 
     }
 
     if request.POST.get('email', False):
