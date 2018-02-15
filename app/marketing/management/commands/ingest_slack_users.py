@@ -1,5 +1,5 @@
 '''
-    Copyright (C) 2017 Gitcoin Core 
+    Copyright (C) 2017 Gitcoin Core
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -17,8 +17,9 @@
 '''
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from slackclient import SlackClient
+
 from marketing.models import EmailSubscriber
+from slackclient import SlackClient
 
 
 def process_email(email):
@@ -26,10 +27,10 @@ def process_email(email):
     if not queryset.exists():
         print(email)
         source = 'slack_ingester'
-        es = EmailSubscriber.objects.create(
+        EmailSubscriber.objects.create(
             email=email,
             source=source,
-            )
+        )
 
 
 class Command(BaseCommand):
@@ -44,7 +45,7 @@ class Command(BaseCommand):
             try:
                 email = member['profile']['email']
                 process_email(email)
-            except:
+            except Exception:
                 pass
 
         # pennding invites
@@ -59,6 +60,3 @@ class Command(BaseCommand):
             members = json.load(f)
             for member in members:
                 process_email(member['email'])
-
-
-

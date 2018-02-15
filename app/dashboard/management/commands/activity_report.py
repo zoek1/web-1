@@ -63,21 +63,30 @@ class Command(BaseCommand):
         return match.groups()[0]
 
     def format_bounty(self, bounty):
+        from dashboard.models import BountyFulfillment
+        try:
+            bounty_fulfillment = bounty.fulfillments.accepted().latest('created_on')
+            claimee_address = bounty_fulfillment.fulfiller_address
+            fulfiller_github_username = bounty_fulfillment.fulfiller_github_username
+        except BountyFulfillment.DoesNotExist:
+            claimee_address = ''
+            fulfiller_github_username = ''
+
         return {
             'type': 'bounty',
             'created_on': bounty.web3_created,
             'last_activity': bounty.modified_on,
             'amount': bounty.get_natural_value(),
             'denomination': bounty.token_name,
-            'amount_eth': bounty.value_in_eth,
+            'amount_eth': bounty.value_in_eth / 10**18,
             'amount_usdt': bounty.value_in_usdt,
             'from_address': bounty.bounty_owner_address,
-            'claimee_address': bounty.claimeee_address,
+            'claimee_address': claimee_address,
             'repo': self.extract_github_repo(bounty.github_url),
             'from_username': bounty.bounty_owner_github_username or '',
-            'claimee_github_username': bounty.claimee_github_username or '',
+            'fulfiller_github_username': fulfiller_github_username,
             'status': bounty.status,
-            'comments': ''
+            'comments': bounty.github_url,
         }
 
     def format_tip(self, tip):
@@ -85,17 +94,17 @@ class Command(BaseCommand):
             'type': 'tip',
             'created_on': tip.created_on,
             'last_activity': tip.modified_on,
-            'amount': tip.get_natural_value(),
+            'amount': tip.get_natural_value() * 10**18,
             'denomination': tip.tokenName,
             'amount_eth': tip.value_in_eth,
             'amount_usdt': tip.value_in_usdt,
-            'from_address': '',
-            'claimee_address': '',
+            'from_address': tip.from_address,
+            'claimee_address': tip.receive_address,
             'repo': self.extract_github_repo(tip.github_url) if tip.github_url else '',
-            'from_username': tip.from_email, # user tipper's email for now so tips are somewhat identifiable
-            'claimee_github_username': '', # don't know who recieves this tip at the moment
+            'from_username': tip.from_name,
+            'fulfiller_github_username': tip.username,
             'status': tip.status,
-            'comments': ''
+            'comments': tip.github_url,
         }
 
     def upload_to_s3(self, filename, contents):
@@ -110,7 +119,7 @@ class Command(BaseCommand):
 
 
     def handle(self, *args, **options):
-        bounties = Bounty.objects.filter(
+        bounties = Bounty.objects.prefetch_related('fulfillments').filter(
             network='mainnet',
             current_bounty=True,
             web3_created__gte=options['start_date'],
@@ -130,7 +139,7 @@ class Command(BaseCommand):
         csvwriter = csv.DictWriter(csvfile, fieldnames=[
             'type', 'created_on', 'last_activity', 'amount', 'denomination', 'amount_eth',
             'amount_usdt', 'from_address', 'claimee_address', 'repo', 'from_username',
-            'claimee_github_username', 'status', 'comments'])
+            'fulfiller_github_username', 'status', 'comments'])
         csvwriter.writeheader()
 
         has_rows = False
@@ -146,6 +155,7 @@ class Command(BaseCommand):
 
             url = self.upload_to_s3('activity_report_%s_%s_generated_on_%s.csv' % (start, end, now), csvfile.getvalue())
             body = '<a href="%s">%s</a>' % (url, url)
+            print(url)
 
             send_mail(settings.CONTACT_EMAIL, settings.CONTACT_EMAIL, subject, body='', html=body, add_bcc=False)
 
