@@ -110,7 +110,7 @@ class Bounty(SuperModel):
     idx_status = models.CharField(max_length=50, default='', db_index=True)
     avatar_url = models.CharField(max_length=255, default='')
     issue_description = models.TextField(default='', blank=True)
-    standard_bounties_id = models.IntegerField(default=0)
+    standard_bounties_id = models.IntegerField(default=0, db_index=True)
     num_fulfillments = models.IntegerField(default=0)
     balance = models.DecimalField(default=0, decimal_places=2, max_digits=50)
     accepted = models.BooleanField(default=False, help_text='Whether the bounty has been done')

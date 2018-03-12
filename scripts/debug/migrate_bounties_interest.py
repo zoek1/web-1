@@ -3,8 +3,15 @@ from dashboard.models import Bounty
 mock = True
 current_bounties = Bounty.objects.filter(current_bounty=True).order_by('-pk')
 for current_bounty in current_bounties:
+    standard_bounties_id = current_bounty.standard_bounties_id
     github_url = current_bounty.github_url
-    other_bounties = Bounty.objects.filter(github_url=github_url, current_bounty=False).order_by('-pk')
+
+    other_bounties = Bounty.objects \
+        .filter(
+            github_url=github_url,
+            current_bounty=False,
+            standard_bounties_id=standard_bounties_id
+        ).order_by('-pk')
     if other_bounties.exists():
         didchange = False
         for interested in other_bounties.first().interested.all():

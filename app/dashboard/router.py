@@ -84,11 +84,12 @@ class BountyViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Bounty.objects.current().order_by('-web3_created')
+        request_keys = self.request.GET.keys()
 
         # filtering
         for key in ['raw_data', 'experience_level', 'project_length', 'bounty_type', 'bounty_owner_address',
                     'idx_status', 'network']:
-            if key in self.request.GET.keys():
+            if key in request_keys:
                 # special hack just for looking up bounties posted by a certain person
                 request_key = key if key != 'bounty_owner_address' else 'coinbase'
                 val = self.request.GET.get(request_key)
@@ -103,16 +104,19 @@ class BountyViewSet(viewsets.ModelViewSet):
                 queryset = _queryset
 
         # filter by PK
-        if 'pk__gt' in self.request.GET.keys():
+        if 'pk__gt' in request_keys:
             queryset = queryset.filter(pk__gt=self.request.GET.get('pk__gt'))
 
         # filter by is open or not
-        if 'is_open' in self.request.GET.keys():
+        if 'is_open' in request_keys:
             queryset = queryset.filter(is_open=self.request.GET.get('is_open') == 'True')
             queryset = queryset.filter(expires_date__gt=datetime.now())
 
+        if 'standard_bounties_id' in request_keys:
+            queryset = queryset.filter(standard_bounties_id=self.request.GET.get('standard_bounties_id'))
+
         # filter by urls
-        if 'github_url' in self.request.GET.keys():
+        if 'github_url' in request_keys:
             urls = self.request.GET.get('github_url').split(',')
             queryset = queryset.filter(github_url__in=urls)
 

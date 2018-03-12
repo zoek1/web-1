@@ -491,19 +491,19 @@ def bounty_details(request, ghuser='', ghrepo='', ghissue=0):
     """Display the bounty details."""
     _access_token = request.session.get('access_token')
     profile_id = request.session.get('profile_id')
-    issueURL = 'https://github.com/' + ghuser + '/' + ghrepo + '/issues/' + ghissue if ghissue else request.GET.get('url')
-    
-    # try the /pulls url if it doesnt exist in /issues
-    try:
-        assert Bounty.objects.current().filter(github_url=issueURL).exists()
-    except:
-        issueURL = 'https://github.com/' + ghuser + '/' + ghrepo + '/pull/' + ghissue if ghissue else request.GET.get('url')
-        print(issueURL)
-        pass
+    issue_url = request.GET.get('url')
+    issue_url = f'https://github.com/{ghuser}/{ghrepo}/issues/{ghissue}' if ghissue else issue_url
+    pull_request_url = f'https://github.com/{ghuser}/{ghrepo}/pull/{ghissue}' if ghissue else issue_url
+    standard_bounties_id = request.GET.get('standard_bounties_id')
+    kwargs = {}
 
-    bounty_url = issueURL
+    if standard_bounties_id:
+        kwargs['standard_bounties_id'] = standard_bounties_id
+    elif issue_url:
+        kwargs['github_url__in'] = [issue_url, pull_request_url]
+
     params = {
-        'issueURL': issueURL,
+        'issueURL': issue_url,
         'title': 'Issue Details',
         'card_title': 'Funded Issue Details | Gitcoin',
         'avatar_url': 'https://gitcoin.co/static/v2/images/helmet.png',
@@ -514,9 +514,9 @@ def bounty_details(request, ghuser='', ghrepo='', ghissue=0):
         "newsletter_headline": "Be the first to know about new funded issues."
     }
 
-    if bounty_url:
+    if issue_url or standard_bounties_id:
         try:
-            bounties = Bounty.objects.current().filter(github_url=bounty_url)
+            bounties = Bounty.objects.current().filter(**kwargs)
             if bounties:
                 bounty = bounties.order_by('pk').first()
                 # Currently its not finding anyting in the database
@@ -642,7 +642,7 @@ def sync_web3(request):
         'status': '400',
         'msg': "bad request"
     }
-
+    standard_bounties_id = request.POST.get('standard_bounties_id')
     issue_url = request.POST.get('url')
     txid = request.POST.get('txid')
     network = request.POST.get('network')
@@ -656,10 +656,9 @@ def sync_web3(request):
                 'msg': 'tx has not mined yet'
             }
         else:
-
             # get bounty id
             print('* getting bounty id')
-            bounty_id = get_bounty_id(issue_url, network)
+            bounty_id = standard_bounties_id or get_bounty_id(issue_url, network)
             if not bounty_id:
                 result = {
                     'status': '400',

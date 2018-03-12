@@ -7,7 +7,8 @@ for current_bounty in current_bounties:
     for interested in current_bounty.interested.all():
         if str(interested) in already_exists:
             interested.delete()
-            print(f"deleting {interested} from {current_bounty.github_url}")
+            print(f"deleting {interested} from {current_bounty.github_url} -",
+                  f"Standard Bounty ID: {current_bounty.standard_bounty_id}")
         else:
             already_exists.append(str(interested))
-    #print(current_bounty.interested.all())
+    # print(current_bounty.interested.all())
