@@ -18,11 +18,10 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-from datetime import datetime
-
-import django_filters.rest_framework
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import routers, serializers, viewsets
 
+from dashboard.filters import BountyFilter
 from .models import Bounty, BountyFulfillment, Interest, ProfileSerializer
 
 
@@ -92,12 +91,12 @@ class BountySerializer(serializers.HyperlinkedModelSerializer):
 
 class BountyViewSet(viewsets.ModelViewSet):
     """Handle the Bounty view behavior."""
-
-    queryset = Bounty.objects.prefetch_related(
-        'fulfillments', 'interested', 'interested__profile') \
-        .all().order_by('-web3_created')
     serializer_class = BountySerializer
-    filter_backends = (django_filters.rest_framework.DjangoFilterBackend,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = BountyFilter
+    filter_fields = ('pk', 'started', 'is_open', 'github_url',
+                     'fulfiller_github_username', 'interested_github_username'
+                     )
 
     def get_queryset(self):
         """Get the queryset for Bounty.
@@ -128,42 +127,7 @@ class BountyViewSet(viewsets.ModelViewSet):
                         _queryset = _queryset | queryset.filter(**args)
                 queryset = _queryset
 
-        # filter by PK
-        if 'pk__gt' in param_keys:
-            queryset = queryset.filter(pk__gt=self.request.query_params.get('pk__gt'))
-
-        # filter by who is interested
-        if 'started' in param_keys:
-            queryset = queryset.filter(interested__profile__handle__in=[self.request.query_params.get('started')])
-
-        # filter by is open or not
-        if 'is_open' in param_keys:
-            queryset = queryset.filter(is_open=self.request.query_params.get('is_open') == 'True')
-            queryset = queryset.filter(expires_date__gt=datetime.now())
-
-        # filter by urls
-        if 'github_url' in param_keys:
-            urls = self.request.query_params.get('github_url').split(',')
-            queryset = queryset.filter(github_url__in=urls)
-
-        # Retrieve all fullfilled bounties by fulfiller_username
-        if 'fulfiller_github_username' in param_keys:
-            queryset = queryset.filter(
-                fulfillments__fulfiller_github_username__iexact=self.request.query_params.get('fulfiller_github_username')
-            )
-
-        # Retrieve all interested bounties by profile handle
-        if 'interested_github_username' in param_keys:
-            queryset = queryset.filter(
-                interested__profile__handle__iexact=self.request.query_params.get('interested_github_username')
-            )
-
-        # order
-        order_by = self.request.query_params.get('order_by')
-        if order_by:
-            queryset = queryset.order_by(order_by)
-
-        return queryset.distinct()
+        return queryset
 
 
 # Routers provide an easy way of automatically determining the URL conf.
