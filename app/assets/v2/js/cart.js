@@ -7,8 +7,6 @@
 // Constants
 const BN = web3.utils.BN;
 const ETH_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
-const MAX_UINT256 = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
-const gitcoinFactor = 0.05; // 5% of donation amount goes to Gitcoin
 const gitcoinAddress = '0x00De4B13153673BCAE2616b67bf822500d325Fc3'; // Gitcoin donation address for mainnet and rinkeby
 
 // Contract parameters
@@ -21,16 +19,19 @@ let grantData = []; // data for grants in cart, initialized in mounted hook
 
 Vue.use(VueTelInput);
 
+
 Vue.component('grants-cart', {
   delimiters: [ '[[', ']]' ],
 
   data: function() {
     return {
+      adjustGitcoinFactor: false, // if true, show section for user to adjust Gitcoin's percentage
+      tokenList: undefined, // array of all tokens for selected network
       isLoading: undefined,
-      csrf: $("input[name='csrfmiddlewaretoken']").val(),
+      gitcoinFactorRaw: 5, // By default, 5% of donation amount goes to Gitcoin
       grantHeaders,
       grantData,
-      currencies: undefined,
+      csrf: $("input[name='csrfmiddlewaretoken']").val(),
       validationStep: 'intro',
       showValidation: false,
       phone: '',
@@ -44,106 +45,148 @@ Vue.component('grants-cart', {
   },
 
   computed: {
-    /**
-     * @notice Generates an object where keys are token names and value are the total amount
-     * being donated in that token
-     * @dev The addition here is based on human-readable numbers so BN is not needed
-     */
-    donationTotals() {
-      const totals = {};
-
-      this.grantData.forEach(grant => {
-        if (!totals[grant.grant_donation_currency]) {
-          // First time seeing this token, set the field and initial value
-          totals[grant.grant_donation_currency] = grant.grant_donation_amount;
-        } else {
-          // We've seen this token, so just update the total
-          totals[grant.grant_donation_currency] += grant.grant_donation_amount;
-        }
-      });
-      return totals;
-    },
-
-    /**
-     * @notice Returns a string of the form "3 DAI + 0.5 ETH + 10 USDC" which describe the
-     * user's donations to grants
-     */
-    donationTotalsString() {
-      if (!this.donationTotals) {
+    // Array of arrays, item i lists supported tokens for donating to grant given by grantData[i]
+    currencies() {
+      if (!this.grantData || !this.tokenList)
         return undefined;
-      }
 
-      let string = '';
-
-      Object.keys(this.donationTotals).forEach(key => {
-        // Round to 2 digits
-        const amount = this.donationTotals[key];
-        const formattedAmount = amount.toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        });
-
-        if (string === '') {
-          string += `${formattedAmount} ${key}`;
-        } else {
-          string += `+ ${formattedAmount} ${key}`;
+      // Get supported tokens for each grant
+      const currencies = this.grantData.map(grant => {
+        // Return full list if grant accepts all tokens
+        if (grant.grant_token_address === '0x0000000000000000000000000000000000000000') {
+          return this.tokenList.map(token => token.name);
         }
+
+        // Return ETH + selected token otherwise
+        let allowedTokens = ['ETH'];
+
+        this.tokenList.forEach(tokenData => {
+          if (tokenData.addr === grant.grant_token_address)
+            allowedTokens.push(tokenData.name);
+        });
+        return allowedTokens;
       });
-      return string;
+
+      return currencies;
     },
 
-    /**
-     * @notice Generates an object where keys are token names and value are the total amount
-     * being donated in that token to Gitcoin
-     * @dev The addition here is based on human-readable numbers so BN is not needed. However,
-     * we do get some floating point error
-     */
+    // Percentage of donation that goes to Gitcoin
+    gitcoinFactor() {
+      return this.gitcoinFactorRaw / 100;
+    },
+
+    // Amounts being donated to grants
+    donationsToGrants() {
+      return this.donationSummaryTotals(1 - this.gitcoinFactor);
+    },
+
+    // Amounts being donated to Gitcoin
     donationsToGitcoin() {
-      const totals = {};
-
-      this.grantData.forEach(grant => {
-        if (!totals[grant.grant_donation_currency]) {
-          // First time seeing this token, set the field and initial value
-          totals[grant.grant_donation_currency] = grant.grant_donation_amount * 0.05;
-        } else {
-          // We've seen this token, so just update the total
-          totals[grant.grant_donation_currency] += (grant.grant_donation_amount * 0.05);
-        }
-      });
-      return totals;
+      return this.donationSummaryTotals(this.gitcoinFactor);
     },
 
-    /**
-     * @notice Returns a string of the form "3 DAI + 0.5 ETH + 10 USDC" which describe the
-     * user's donations to the Gitcoin grant
-     */
+    // Total amounts being donated
+    donationsTotal() {
+      return this.donationSummaryTotals(1);
+    },
+
+    // String describing user's donations to grants
+    donationsToGrantsString() {
+      return this.donationSummaryString('donationsToGrants', 2);
+    },
+
+    // String describing user's donations to Gitcoin
     donationsToGitcoinString() {
-      if (!this.donationsToGitcoin) {
+      return this.donationSummaryString('donationsToGitcoin', 4);
+    },
+
+    // String describing user's total donations
+    donationsTotalString() {
+      return this.donationSummaryString('donationsTotal', 2);
+    },
+
+    // Array of objects containing all donations and associated data
+    donationInputs() {
+      if (!this.grantData)
         return undefined;
+
+      // Generate array of objects containing donation info from cart
+      let gitcoinFactor = 100 * this.gitcoinFactor;
+      const donations = this.grantData.map((grant) => {
+        const tokenDetails = this.getTokenByName(grant.grant_donation_currency);
+        const amount = this.toWeiString(grant.grant_donation_amount, tokenDetails.decimals, 100 - gitcoinFactor);
+
+        return {
+          token: tokenDetails.addr,
+          amount,
+          dest: grant.grant_admin_address,
+          name: grant.grant_donation_currency
+        };
+      });
+
+      // Append the Gitcoin donations (these already account for gitcoinFactor)
+      Object.keys(this.donationsToGitcoin).forEach((token) => {
+        const tokenDetails = this.getTokenByName(token);
+        const amount = this.toWeiString(this.donationsToGitcoin[token], tokenDetails.decimals);
+
+        donations.push({
+          amount,
+          token: tokenDetails.addr,
+          dest: gitcoinAddress,
+          name: token
+        });
+      });
+      return donations;
+    },
+
+    // Amount of ETH that needs to be sent along with the transaction
+    donationInputsEthAmount() {
+      // Get the total ETH we need to send
+      const initialValue = new BN('0');
+      const ethAmountBN = this.donationInputs.reduce((accumulator, currentValue) => {
+        return currentValue.token === ETH_ADDRESS
+          ? accumulator.add(new BN(currentValue.amount)) // ETH donation
+          : accumulator.add(new BN('0')); // token donation
+      }, initialValue);
+
+      return ethAmountBN.toString(10);
+    },
+
+    // Estimated gas limit for the transaction
+    donationInputsGasLimit() {
+      // Based on contract tests, we use the heuristic below to get gas estimate. This is done
+      // instead of `estimateGas()` so we can send the donation transaction before the approval txs
+      // are confirmed, because if the approval txs are not confirmed then estimateGas will fail.
+      // The estimates used here are based on single donations (i.e. one item in the cart). Because
+      // gas prices go down with batched transactions, whereas this assumes they're constant,
+      // this gives us a conservative estimate
+      const gasLimit = this.donationInputs.reduce((accumulator, currentValue) => {
+        return currentValue.token === ETH_ADDRESS
+          ? accumulator + 50000// ETH donation gas estimate
+          : accumulator + 100000; // token donation gas estimate
+      }, 0);
+
+      return gasLimit;
+    },
+
+    maxPossibleTransactions() {
+      if (!this.donationsTotal) {
+        return '-';
       }
 
-      let string = '';
+      let number = 1;
 
-      Object.keys(this.donationsToGitcoin).forEach(key => {
-        // Round to 2 digits
-        const amount = this.donationsToGitcoin[key];
-        const formattedAmount = amount.toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 4
-        });
-
-        if (string === '') {
-          string += `${formattedAmount} ${key}`;
-        } else {
-          string += `+ ${formattedAmount} ${key}`;
+      Object.keys(this.donationsTotal).forEach((token) => {
+        if (token !== 'ETH') {
+          number += 1;
         }
       });
-      return string;
+      return number;
     }
   },
 
   methods: {
-    dismissVerification(hide) {
+    dismissVerification() {
       localStorage.setItem('dismiss-sms-validation', true);
       this.showValidation = false;
     },
@@ -241,7 +284,7 @@ Vue.component('grants-cart', {
       console.log(validation);
       this.validNumber = validation.isValid;
     },
-    clearCart() {
+     clearCart() {
       window.localStorage.setItem('grants_cart', JSON.stringify([]));
       this.grantData = [];
     },
@@ -249,6 +292,54 @@ Vue.component('grants-cart', {
     removeGrantFromCart(id) {
       this.grantData = this.grantData.filter(grant => grant.grant_id !== id);
       window.localStorage.setItem('grants_cart', JSON.stringify(this.grantData));
+    },
+
+    /**
+     * @notice Generates an object where keys are token names and value are the total amount
+     * being donated in that token. Scale factor scales the amounts used by a constant
+     * @dev The addition here is based on human-readable numbers so BN is not needed
+     */
+    donationSummaryTotals(scaleFactor = 1) {
+      const totals = {};
+
+      this.grantData.forEach(grant => {
+        if (!totals[grant.grant_donation_currency]) {
+          // First time seeing this token, set the field and initial value
+          totals[grant.grant_donation_currency] = grant.grant_donation_amount * scaleFactor;
+        } else {
+          // We've seen this token, so just update the total
+          totals[grant.grant_donation_currency] += (grant.grant_donation_amount * scaleFactor);
+        }
+      });
+      return totals;
+    },
+
+    /**
+     * @notice Returns a string of the form "3 DAI + 0.5 ETH + 10 USDC" which describe the
+     * user's donations for a given property
+     */
+    donationSummaryString(propertyName, maximumFractionDigits = 2) {
+      if (!this[propertyName]) {
+        return undefined;
+      }
+
+      let string = '';
+
+      Object.keys(this[propertyName]).forEach(key => {
+        // Round to 2 digits
+        const amount = this[propertyName][key];
+        const formattedAmount = amount.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits
+        });
+
+        if (string === '') {
+          string += `${formattedAmount} ${key}`;
+        } else {
+          string += `+ ${formattedAmount} ${key}`;
+        }
+      });
+      return string;
     },
 
     handleError(err) {
@@ -289,47 +380,34 @@ Vue.component('grants-cart', {
      * to the proper integer value based on the number of token decimals
      * @param {Number} number Human-readable number to convert, e.g. 0.1 or 3
      * @param {Number} decimals Number of decimals for conversion to Wei
+     * @param {Number} scaleFactor Factor to multiply number by, as percent*100, e.g. value of 100
+     * means multiply by scale factor of 1
      */
-    toWeiString(number, decimals) {
+    toWeiString(number, decimals, scaleFactor = 100) {
       const wei = web3.utils.toWei(String(number));
       const base = new BN(10, 10);
       const factor = base.pow(new BN(18 - decimals, 10));
+      const scale = new BN(scaleFactor, 10);
+      const amount = (new BN(wei)).mul(scale).div(new BN(100, 10));
 
-      return (new BN(wei)).div(factor).toString(10);
+      return amount.div(factor).toString(10);
     },
 
+    /**
+     * @notice Checkout flow
+     */
     async checkout() {
       try {
+        // Setup -----------------------------------------------------------------------------------
         await window.ethereum.enable();
-        const isDev = network === 'rinkeby'; // True if in development mode
         const userAddress = (await web3.eth.getAccounts())[0]; // Address of current user
 
-        // Generate array of objects containing donation info from cart
-        const donations = this.grantData.map((grant) => {
-          const tokenDetails = this.getTokenByName(grant.grant_donation_currency);
+        // Get list of tokens user is donating with
+        const selectedTokens = Object.keys(this.donationsToGrants);
 
-          return {
-            token: tokenDetails.addr,
-            amount: this.toWeiString(grant.grant_donation_amount, tokenDetails.decimals),
-            dest: grant.grant_admin_address,
-            name: grant.grant_donation_currency
-          };
-        });
-
-        // Append the Gitcoin donations
-        Object.keys(this.donationsToGitcoin).forEach((token) => {
-          const tokenDetails = this.getTokenByName(token);
-
-          donations.push({
-            amount: this.toWeiString(this.donationsToGitcoin[token], tokenDetails.decimals),
-            token: tokenDetails.addr,
-            dest: gitcoinAddress,
-            name: token
-          });
-        });
-
-        // Get token approvals
-        const selectedTokens = Object.keys(this.donationTotals);
+        // Token approval checks -------------------------------------------------------------------
+        // For each token, check if an approval is needed, and if so save off the data
+        let allowanceData = [];
 
         for (let i = 0; i < selectedTokens.length; i += 1) {
           const tokenDetails = this.getTokenByName(selectedTokens[i]);
@@ -341,7 +419,6 @@ Vue.component('grants-cart', {
 
           // Get current allowance
           const tokenContract = new web3.eth.Contract(token_abi, tokenDetails.addr);
-
           const allowance = new BN(
             await tokenContract.methods
               .allowance(userAddress, bulkCheckoutAddress)
@@ -349,54 +426,89 @@ Vue.component('grants-cart', {
           );
 
           // Get required allowance based on donation amounts
-          const requiredAllowance = this.toWeiString(this.donationTotals[tokenDetails.name], tokenDetails.decimals);
+          // We use reduce instead of this.donationsTotal because this.donationsTotal will
+          // not have floating point errors, but the actual amounts used will
+          const initialValue = new BN('0');
+          const requiredAllowance = this.donationInputs.reduce((accumulator, currentValue) => {
+            return currentValue.token === tokenDetails.addr
+              ? accumulator.add(new BN(currentValue.amount)) // correct token donation
+              : accumulator.add(new BN('0')); // ETH donation
+          }, initialValue);
 
-          // Compare allowances and request approval if needed
-          if (allowance.lt(new BN(requiredAllowance))) {
-            indicateMetamaskPopup();
-            const txHash = await tokenContract.methods
-              .approve(bulkCheckoutAddress, MAX_UINT256)
-              .send({ from: userAddress });
-
-            console.log('Approval transaction: ', txHash);
-            indicateMetamaskPopup(true);
+          // If no allowance is needed, continue to next token
+          if (allowance.gte(new BN(requiredAllowance))) {
+            continue;
           }
-        } // end for each token being used for donations
 
-        // Get the total ETH we need to send
-        const initialValue = new BN('0');
-        const ethAmountBN = donations.reduce((accumulator, currentValue) => {
-          return currentValue.token === ETH_ADDRESS
-            ? accumulator.add(new BN(currentValue.amount)) // ETH donation
-            : accumulator.add(new BN('0')); // token donation
-        }, initialValue);
-        const ethAmountString = ethAmountBN.toString();
+          // If we do need to set the allowance, save off the required info
+          allowanceData.push({
+            allowance: requiredAllowance.toString(),
+            contract: tokenContract
+          });
+        } // end checking approval requirements for each token being used for donations
 
-        // Configure our donation inputs
-        const donationInputs = donations.map(donation => {
-          delete donation.name;
-          return donation;
-        });
+        // Send donation if no approvals -----------------------------------------------------------
+        if (allowanceData.length === 0) {
+          // Send transaction and exit function
+          this.sendDonationTx(userAddress);
+          return;
+        }
 
-        // Estimate gas to send all of them
-        // Arbitrarily choose to use a gas limit 10% higher than estimated gas
-        bulkTransaction = new web3.eth.Contract(bulkCheckoutAbi, bulkCheckoutAddress);
-        const estimatedGas = await bulkTransaction.methods
-          .donate(donationInputs)
-          .estimateGas({ from: userAddress, value: ethAmountString});
-        const gasLimit = Math.ceil(1.1 * estimatedGas);
-
-        // Send the transaction
+        // Get approvals then send donation --------------------------------------------------------
         indicateMetamaskPopup();
-        const txHash = await bulkTransaction.methods
-          .donate(donationInputs)
-          .send({ from: userAddress, gas: gasLimit, value: ethAmountString });
+        for (let i = 0; i < allowanceData.length; i += 1) {
+          const allowance = allowanceData[i].allowance;
+          const contract = allowanceData[i].contract;
+          const approvalTx = contract.methods.approve(bulkCheckoutAddress, allowance);
 
-        console.log('Donation transaction: ', txHash);
-        indicateMetamaskPopup(true);
+          // We split this into two very similar branches, because on the last approval
+          // we send the main donation transaction after we get the transaction hash
+          if (i !== allowanceData.length - 1) {
+            approvalTx.send({ from: userAddress })
+              .on('error', (error, receipt) => {
+                // If the transaction was rejected by the network with a receipt, the second parameter will be the receipt.
+                this.handleError(error);
+              });
+          } else {
+            approvalTx.send({ from: userAddress })
+              .on('transactionHash', (txHash) => { // eslint-disable-line no-loop-func
+                indicateMetamaskPopup(true);
+                this.sendDonationTx(userAddress);
+              })
+              .on('error', (error, receipt) => {
+                // If the transaction was rejected by the network with a receipt, the second parameter will be the receipt.
+                this.handleError(error);
+              });
+          }
+        }
       } catch (err) {
         this.handleError(err);
       }
+    },
+
+    sendDonationTx(userAddress) {
+      // Configure our donation inputs
+      const bulkTransaction = new web3.eth.Contract(bulkCheckoutAbi, bulkCheckoutAddress);
+      const donationInputs = this.donationInputs.map(donation => {
+        delete donation.name;
+        return donation;
+      });
+
+      indicateMetamaskPopup();
+      bulkTransaction.methods
+        .donate(donationInputs)
+        .send({ from: userAddress, gas: this.donationInputsGasLimit, value: this.donationInputsEthAmount })
+        .on('transactionHash', (txHash) => {
+          console.log('Donation transaction: ', txHash);
+          indicateMetamaskPopup(true);
+        })
+        .on('confirmation', (confirmationNumber, receipt) => {
+          // TODO?
+        })
+        .on('error', (error, receipt) => {
+          // If the transaction was rejected by the network with a receipt, the second parameter will be the receipt.
+          this.handleError(error);
+        });
     },
 
     sleep(ms) {
@@ -414,15 +526,15 @@ Vue.component('grants-cart', {
     }
   },
 
-  async mounted() {
+	async mounted() {
     // Show loading dialog
     this.isLoading = true;
     // Read array of grants in cart from localStorage
     this.grantData = JSON.parse(window.localStorage.getItem('grants_cart'));
     // Wait until we can load token list
-    while (!this.currencies) {
+    while (!this.tokenList) {
       try {
-        this.currencies = tokens(network).map(token => token.name);
+        this.tokenList = tokens(network);
       } catch (err) {}
       await this.sleep(50); // every 50 ms
     }
@@ -432,6 +544,7 @@ Vue.component('grants-cart', {
 });
 
 if (document.getElementById('gc-grants-cart')) {
+
   const app = new Vue({
     delimiters: [ '[[', ']]' ],
     el: '#gc-grants-cart',

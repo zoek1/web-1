@@ -246,6 +246,7 @@ def grants(request):
     grant_type = request.GET.get('type', 'all')
     state = request.GET.get('state', 'active')
     category = request.GET.get('category', '')
+    profile = get_profile(request)
     _grants = None
     bg = 4
     bg = f"{bg}.jpg"
@@ -419,7 +420,8 @@ def grants(request):
         'show_past_clr': show_past_clr,
         'is_staff': request.user.is_staff,
         'selected_category': category,
-        'round_5_5_grants': round_5_5_grants
+        'round_5_5_grants': round_5_5_grants,
+        'profile': profile
     }
 
     # log this search, it might be useful for matching purposes down the line
@@ -621,15 +623,18 @@ def flag(request, grant_id):
     })
 
 
-@login_required
 def grant_new_whitelabel(request):
     """Create a new grant, with a branded creation form for specific tribe"""
 
+    profile = get_profile(request)
+
     params = {
         'active': 'new_grant',
-        'title': _('New Grant'),
-        'card_desc': _('Provide sustainable funding for Open Source with Gitcoin Grants'),
+        'title': _('Matic Build-n-Earn x Gitcoin'),
+        'card_desc': _('Earn Rewards by Making Your DApps Superior'),
+        'card_player_thumb_override': request.build_absolute_uri(static('v2/images/grants/maticxgitcoin.png')),
         'profile': profile,
+        'is_logged_in': 1 if profile else 0,
         'grant': {},
         'keywords': get_keywords(),
         'recommend_gas_price': recommend_min_gas_price_to_confirm_in_time(4),
@@ -1035,6 +1040,11 @@ def subscription_cancel(request, grant_id, grant_slug, subscription_id):
     }
 
     return TemplateResponse(request, 'grants/cancel.html', params)
+
+def grants_cart_view(request):
+    response =  TemplateResponse(request, 'grants/cart-vue.html')
+    response['X-Frame-Options'] = 'SAMEORIGIN'
+    return response
 
 
 def grants_cart_view(request):
