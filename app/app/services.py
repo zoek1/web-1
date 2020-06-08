@@ -33,10 +33,10 @@ class TwilioService:
             cls.instance = super().__new__(cls)
         return cls.instance
 
-    def __init__(self):
+    def __create_connection(self):
         redis = RedisService().redis
-        sid = redis.get(f"validation:twilio:sid")
-        if not TwilioService._client and not sid:
+
+        if not TwilioService._client:
             TwilioService._client = Client(account_sid, auth_token)
 
             TwilioService._service = TwilioService._client.verify.services.create(
@@ -44,8 +44,15 @@ class TwilioService:
             )
             redis.set(f"validation:twilio:sid", TwilioService._service.sid)
 
+    def __init__(self):
+        self.__create_connection()
+
+    @property
+    def lookups(self):
+        return TwilioService._client.lookups
+
     @property
     def verify(self):
         redis = RedisService().redis
         sid = redis.get(f"validation:twilio:sid")
-        return TwilioService.verify.services(sid.decode('utf-8'))
+        return TwilioService._client.verify.services(sid.decode('utf-8'))

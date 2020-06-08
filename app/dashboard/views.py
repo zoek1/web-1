@@ -27,6 +27,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+import dateutil
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
@@ -5340,39 +5341,59 @@ def bulkDM(request):
     return TemplateResponse(request, 'bulk_DM.html', context)
 
 
+def validate_number(user_id, twilio, phone, redis):
+    validation = twilio.lookups.phone_numbers(phone).fetch(type=['caller-name', 'carrier'])
+
+    if validation.caller_name and validation.caller_name["caller_type"] == 'CONSUMER':
+        return JsonResponse({
+            'success': False,
+            'msg': 'Only support consumer numbers'
+        }, status=401)
+    if validation.carrier and validation.carrier['type'] != 'mobile':
+        return JsonResponse({
+            'success': False,
+            'msg': 'Phone type isn\'t supported'
+        }, status=401)
+
+    verification = twilio.verify.verifications.create(to=phone, channel='sms')
+    redis.set(f'verification:{user_id}:timestamp', timezone.now().isoformat())
+    redis.set(f'verification:{user_id}:phone', phone)
+
+
+
 @login_required
 def send_verification(request):
     phone = request.POST.get('phone')
     redis = RedisService().redis
-    twilio = TwilioService().verify
-
+    twilio = TwilioService()
     has_previous_validation = redis.get(f'verification:{request.user.id}:timestamp')
     validation_attempts = redis.get(f'verification:{request.user.id}:attempts')
     if not has_previous_validation:
-        verification = twilio.verifications.create(to=phone, channel='sms')
-        redis.set(f'verification:{request.user.id}:timestamp', timezone.now().isoformat())
-        redis.set(f'verification:{request.user.id}:phone', phone)
+        response = validate_number(request.user.id, twilio, phone, redis)
+        if response:
+            return response
+
         redis.set(f'verification:{request.user.id}:attempts', 0)
     else:
-        cooldown = datetime.fromisoformat(has_previous_validation) + timedelta(minutes=1)
-        if int(validation_attempts.decode('utf-8')) < 4:
-            return JsonResponse({
-                'success': False,
-                'msg': 'number of attempts exceeded'
-            })
+        cooldown = dateutil.parser.isoparse(has_previous_validation.decode('utf-8')) + timedelta(minutes=1)
         if cooldown > datetime.now():
             return JsonResponse({
                 'success': False,
-                'msg': 'Wait a minute to try again'
-            })
-        verification = twilio.verifications.create(to=phone, channel='sms')
-        redis.set(f'verification:{request.user.id}:timestamp', timezone.now().isoformat())
-        redis.set(f'verification:{request.user.id}:phone', phone)
+                'msg': 'Wait a minute to try again.'
+            }, status=401)
+
+        if int(validation_attempts.decode('utf-8')) > 10:
+            return JsonResponse({
+                'success': False,
+                'msg': 'Attempt numbers exceeded.'
+            }, status=401)
+
+        validate_number(request.user.id, twilio, phone, redis)
         redis.set(f'verification:{request.user.id}:attempts', int(validation_attempts.decode('utf-8')) + 1)
 
     return JsonResponse({
         'success': True,
-        'msg': 'The verification number was sent'
+        'msg': 'The verification number was sent.'
     })
 
 
@@ -5401,9 +5422,9 @@ def validate_verification(request):
         return JsonResponse({
             'success': False,
             'msg': 'Failed verification'
-        })
+        }, status=401)
 
     return JsonResponse({
         'success': False,
         'msg': 'No verification process associated'
-    })
+    }, status=401)
