@@ -1,0 +1,65 @@
+{% comment %}
+    Copyright (C) 2019 Gitcoin Core
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program. If not,see
+    <http://www.gnu.org/licenses/>.
+{% endcomment %}
+{% load i18n static %}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% include 'shared/head.html' %}
+    {% include 'shared/cards.html' %}
+    <link rel="stylesheet" href="{% static "v2/css/mentor/styles.css" %}" />
+  </head>
+  <body class="{{ active }} g-font-muli">
+    {% include 'shared/top_nav.html' with class='d-md-flex' %}
+    <header class="header">
+      {% include 'shared/mentor_nav.html' %}
+      <div class="container text-center mt-5 pb-5">
+        <h1 class="white h2 center">
+          To continue, please setup the prefered payout address to associate one session with you account.
+        </h1>
+
+      </div>
+    </header>
+    <div class="mt-5 mb-5 container text-center">
+       <p>Go to <a href="/settings/account">your preferences</a> and set up you address</p>
+
+       <div class="row">
+         <div class="col-md-8">
+          <img width="100%" src="{%  static 'v2/images/mentor/account.png' %}">
+         </div>
+       </div>
+      <a class="mt-4 mb-4 btn btn-lg btn-primary" href="/settings/account">Add default address</a>
+    </div>
+
+
+    </div>
+
+    {% include 'shared/footer.html' %}
+    {% include 'shared/analytics.html' %}
+    {% include 'shared/footer_scripts.html' with slim=1 %}
+    <script src="{% static "v2/js/lib/popper.min.js" %}"></script>
+    <script src="{% static "v2/js/lib/bootstrap.min.js" %}" crossorigin="anonymous"></script>
+    <script src="{% static "v2/js/mentor.js" %}"></script>
+
+    <script>
+      $(document).ready(function() {
+
+      });
+    </script>
+
+  </body>

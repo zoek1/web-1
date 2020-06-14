@@ -1,0 +1,78 @@
+{% comment %}
+    Copyright (C) 2019 Gitcoin Core
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program. If not,see
+    <http://www.gnu.org/licenses/>.
+{% endcomment %}
+{% load i18n static %}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% include 'shared/head.html' %}
+    {% include 'shared/cards.html' %}
+    <link rel="stylesheet" href="{% static "v2/css/mentor/styles.css" %}" />
+  </head>
+  <body class="{{ active }} g-font-muli">
+    {% include 'shared/top_nav.html' with class='d-md-flex' %}
+    <header class="header">
+      {% include 'shared/mentor_nav.html' %}
+      <div class="container text-center mt-5 pb-5">
+        <h1 class="white h2">
+          Mentor is a new way to build relationships.
+        </h1>
+      </div>
+    </header>
+
+  {% if sessions %}
+    <div class="container pt-5">
+    <h2>My sessions</h2>
+        <div class="row justify-content-around my-5">
+          {% for session in sessions %}
+              {% include 'shared/mentor_card.html' with session=session %}
+          {%  endfor %}
+        </div>
+      </div>
+  {% endif %}
+    <div class="container pt-5">
+    <h2>Available mentors</h2>
+      <div class="row justify-content-around my-5">
+        {% for session in available_mentors %}
+            {% include 'shared/mentor_card.html' with mentor=session.mentor %}
+        {%  endfor %}
+      </div>
+    </div>
+    <div class="container pt-5">
+
+    <h2>Busy mentors</h2>
+      <div class="row justify-content-around my-5">
+          {% for session in unavailable_mentors %}
+              {% include 'shared/mentor_card.html' with mentor=session.mentor %}
+          {%  endfor %}
+        </div>
+      </div>
+    {% include 'shared/footer.html' %}
+    {% include 'shared/analytics.html' %}
+    {% include 'shared/footer_scripts.html' with slim=1 %}
+    <script src="{% static "v2/js/lib/popper.min.js" %}"></script>
+    <script src="{% static "v2/js/lib/bootstrap.min.js" %}" crossorigin="anonymous"></script>
+    <script src="{% static "v2/js/mentor.js" %}"></script>
+
+    <script>
+      $(document).ready(function() {
+
+      });
+    </script>
+
+  </body>

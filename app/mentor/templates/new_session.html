@@ -1,0 +1,110 @@
+{% comment %}
+    Copyright (C) 2019 Gitcoin Core
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program. If not,see
+    <http://www.gnu.org/licenses/>.
+{% endcomment %}
+{% load i18n static %}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% include 'shared/head.html' %}
+    {% include 'shared/cards.html' %}
+    <link rel="stylesheet" href="{% static "v2/css/mentor/styles.css" %}" />
+  </head>
+  <body class="{{ active }} g-font-muli">
+    {% include 'shared/top_nav.html' with class='d-md-flex' %}
+    <header class="header">
+      {% include 'shared/mentor_nav.html' %}
+      <div class="container text-center mt-5">
+        <h1 class="white h2">
+          Mentor is a new way to build relationships.
+        </h1>
+      </div>
+      <div class="container pt-5">
+        <div id="carouselkudos" class="carousel slide" data-ride="carousel">
+          <div class="carousel-inner">
+            <div class="carousel-item active">
+              <div class="row justify-content-center">
+                {% for listing in listings %}
+                  <div class="col-xs-12 col-sm-6 col-lg-3">
+                    {% include 'shared/session_card.html' %}
+                  </div>
+                {% if forloop.counter|divisibleby:4 and not forloop.last %}
+              </div>
+            </div>
+            <div class="carousel-item">
+              <div class="row justify-content-center">
+                {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+          </div> <!-- carousel-inner -->
+          <div class="carousel-control-mentor">
+            <a class="carousel-control-prev" href="#carouselmentor" role="button" data-slide="prev">
+              <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+              <span class="sr-only">Previous</span>
+            </a>
+            <a class="carousel-control-next" href="#carouselmentor" role="button" data-slide="next">
+              <span class="carousel-control-next-icon" aria-hidden="true"></span>
+              <span class="sr-only">Next</span>
+            </a>
+          </div>
+        </div> <!-- /carousel -->
+
+      </div>
+    </header>
+
+		<div class="container">
+			<form action="/mentor/new" method="post">
+				<div class="form-group my-3 mx-auto w-25">
+					<p class="lead">Create a new mentoring room below!</p>
+
+					<label for="name">Name of the room</label>
+					<input type="text" class="form-control" name="name" id="name" />
+
+					<label for="description">Description</label>
+					<input name="description" class="form-control" name="description" id="description" class="form-control"/>
+
+					<label for="price_per_min">Price per minute in DAI</label>
+					<input name="price_per_min" type="number" min="0" class="form-control" placeholder="0.50 DAI / minute"> 
+
+					<label>Ethereum address</label>
+					<input name="address" type="address" id="address" class="form-control" />
+
+					{% csrf_token %}
+					<input type="submit" class="btn btn-primary" value="Submit" />
+				</div>
+			</form>
+		</div>
+    </section>
+    {% include 'shared/footer.html' %}
+    {% include 'shared/analytics.html' %}
+    {% include 'shared/footer_scripts.html' with slim=1 %}
+    <script src="{% static "v2/js/lib/popper.min.js" %}"></script>
+    <script src="{% static "v2/js/lib/bootstrap.min.js" %}" crossorigin="anonymous"></script>
+    <script src="{% static "v2/js/mentor.js" %}"></script>
+
+    <script>
+      $(document).ready(function() {
+				console.log('ready')	
+				ethereum.enable().then(([address]) => {
+					console.log('hello', address)
+					$('#to_address').val(address);
+				})
+      });
+    </script>
+
+  </body>

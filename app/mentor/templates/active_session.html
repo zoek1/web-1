@@ -1,0 +1,188 @@
+{% comment %}
+    Copyright (C) 2019 Gitcoin Core
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program. If not,see
+    <http://www.gnu.org/licenses/>.
+{% endcomment %}
+{% load i18n static %}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% include 'shared/head.html' %}
+    {% include 'shared/cards.html' %}
+    <link rel="stylesheet" href="{% static "v2/css/mentor/styles.css" %}" />
+		<script src='https://meet.jit.si/external_api.js'></script>
+  </head>
+  <body class="{{ active }} g-font-muli">
+    {% include 'shared/top_nav.html' with class='d-md-flex' %}
+    <header class="header">
+      {% include 'shared/mentor_nav.html' %}
+			{% if  session %}
+      <!-- TODO replace it by the correct mentor nav -->>
+      <div class="container text-center mt-5">
+        <h1 class="white h2">
+        </h1>
+        <h1 class="white h4">
+          {{ session.description }}
+        </h1>
+
+      </div>
+      {% endif %}
+    </header>
+
+    {% if session %}
+		<section class="container main my-3">
+			<div class="row">
+				<div class="col-sm">
+					<div id="jitsy-placeholder">
+					</div>
+				</div>
+				<div class="col-sm text-centered my-3">
+					<p>You're currently streaming with {{session.mentor.name}}</p>
+					<p class="lead">
+						<span class="diff">
+							<span class="min"></span>
+							:
+							<span class="sec"></span>
+						</span> / 
+						<span class="total">
+							<span class="min"></span>
+							:
+							<span class="sec"></span>
+						<span>
+					</p>
+					<div class="progress">
+						<div 
+							class="progress-bar progress-bar-striped" 
+							role="progressbar" 
+							style="width: 1%" 
+							aria-valuenow="10" 
+			 				aria-valuemin="0" 
+							aria-valuemax="100"></div>
+					</div>
+						<p class="deposit">
+						<span class="streamed-dai"></span>  DAI out of 
+						<span class="deposit-dai"></span> DAI.
+					</p>
+					<button class="btn btn-primary stop-stream-btn">Stop session</button>
+					<button class="btn btn-secondary withdrawn-btn-show">Withdraw</button>
+				</div>
+			</div>
+		</section>
+		<section class="container wait my-3 text-center">
+			<div class="spinner-border" role="status">
+				<span class="sr-only">Loading...</span>
+			</div>
+			<p class="lead">
+				Waiting for somebody to connect to the stream.
+			</p>
+		</section>
+		<section class="container wait-stream my-3 text-center">
+			<div class="spinner-grow" role="status">
+				<span class="sr-only">Loading...</span>
+			</div>
+			<p class="lead">
+				The stream will start in 
+				<span class="if-min">
+					<span class="min"></span> minutes and 
+				</span>
+				<span class="sec"></span> seconds.
+			</p>
+		</section>
+		<section class="container wait-stream-register my-3 text-center">
+			<div class="spinner-border" role="status">
+				<span class="sr-only">Loading...</span>
+			</div>
+			<p class="lead">Waiting for the stream to be published.</p>
+			<p><small>Don't forget to check your Metamask extension!</small></p>
+			<button class="btn btn-primary create-retry-btn">Retry</button>
+			<button class="btn btn-secondary create-cancel-btn">Cancel</button>
+		</section>
+		<section class="container wait-stream-deletion my-3 text-center">
+			<div class="spinner-border" role="status">
+				<span class="sr-only">Loading...</span>
+			</div>
+			<p class="lead">
+				The stream is being deleted, please wait.
+			</p>
+		</section>
+		<section class="container wait-metamask my-3 text-center">
+			<div class="spinner-border" role="status">
+				<span class="sr-only">Loading...</span>
+			</div>
+			<p class="lead">
+				Please enable metamask!
+			</p>
+		</section>
+		<section class="container stream-busy my-3 text-center">
+			<div class="spinner-grow" role="status">
+				<span class="sr-only">Loading...</span>
+			</div>
+			<p class="lead">
+				This stream is busy. Try again later.
+			</p>
+		</section>
+		<section class="container create-stream my-3 text-centered">
+			<img src="https://www.sablier.finance/static/media/logo.ace48f85.svg">
+			<h1>Deposit to the stream</h1>
+			<p class="lead">
+				Commission the real-time stream using the form below! The mentor will be yours in a minute!
+			</p>
+			<p>The stream can be cancelled at every moment and you will be refunded with the rest of the money.</p>
+			<form class="deposit-form">
+				<div class="form-group">
+					<label for="deposit">Deposit</label>
+					<input 
+						id="deposit" 
+						type="number" 
+						class="form-number" 
+						aria-describedby="depositDescribe" 
+						min="0"
+						placeholder="30"/> minutes
+					<small id="depositDescribe" class="form-text text-muted">
+						You will commission <span class="deposit-dai"></span> DAI
+						(<span class="deposit-rate"></span> DAI / minute).
+					</small>
+				</div>
+				<button type="button" class="btn btn-primary create-btn">Create stream</input>
+			</form>
+		</section>
+    {% else %}
+      <section class="container main">
+			<div class="row">
+        <div class="col-sm-12 col-md-8 offset-md-2 mt-5 mb-5 text-center" >
+          <h2 class="center">Hey there's nobody here yet, would you like to create a session?</h2>
+          <a class="center btn btn-lg btn-gc-blue mt-4" href="{% url 'mentor_new' %}">Create session</a>
+          <img style="display: block" src="https://media3.giphy.com/media/JY5dig6xQ9S7u/source.gif" alt="">
+        </div>
+
+
+			</div>
+		</section>
+    {% endif %}
+    {% include 'shared/footer.html' %}
+    {% include 'shared/analytics.html' %}
+    {% include 'shared/footer_scripts.html' with slim=1 %}
+		<script>
+  		const room_address = "{{session.mentor.address}}";
+			const rate_per_min = {{session.rate_per_min}};
+		</script>
+    <script src="{% static "v2/js/lib/popper.min.js" %}"></script>
+    <script src="{% static "v2/js/lib/bootstrap.min.js" %}" crossorigin="anonymous"></script>
+		<script src="{% static "v2/js/mentor.js" %}"></script>
+		<script src="{% static "v2/js/abi.js" %}"></script>
+		<script src="{% static "v2/js/pages/mentor_active_session.js" %}"></script>
+
+  </body>
