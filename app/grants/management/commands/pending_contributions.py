@@ -28,7 +28,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         contributions = Contribution.objects.filter(
-            validator_comment__contains="User may not be aware so send them email reminders")
+            validator_comment__contains="User may not be aware so send them email reminders").distinct('subscription__contributor_profile')
+
         for contribution in contributions:
+            print(f'Sending cart reminder to {contribution.subscription.contributor_profile.handle}')
             pending_contribution(contribution)
 
