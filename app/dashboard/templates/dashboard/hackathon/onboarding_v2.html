@@ -1,5 +1,5 @@
 {% load static %}
-<div class="modal no-bg" style="color: #212529; font-size: 12pt;" id="onboarding_v2" tabindex="-1" role="dialog" aria-labelledby="onboarding_v2" >
+<div class="modal" style="color: #212529; font-size: 12pt; background: rgba(0, 0, 0, 0.2);" id="onboarding_v2" tabindex="-1" role="dialog" aria-labelledby="onboarding_v2" >
   <div class="modal-dialog modal-lg " role="document">
     <div class="modal-content" >
       <img src="{% static 'v2/images/hackathon/onboarding_v2/achievement.svg'%}" class="achievement-img d-none d-lg-inline"/>
@@ -185,7 +185,6 @@
     window.localStorage.setItem(storageKey, hideModal ? 0 : 1)
     showOnboarding = false
     $('.jquery-modal').remove()
-    $('body').css('overflow', 'scroll')
     $('#onboarding_v2').bootstrapModal('hide');
   }
 
@@ -196,9 +195,7 @@
   }
 
   $(window).on('load', function () {
-    {% if not hideModal %}
     loadOnboardingModal()
-    {% endif %}
   });
 
   $(document).on('readystatechange', () => {
